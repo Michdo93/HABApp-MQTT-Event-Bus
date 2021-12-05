@@ -10,31 +10,43 @@ from HABApp.openhab.items import OpenhabItem
 log = logging.getLogger('MQTTEventBus')
 
 # These are the configuration values that will be used to setup the MqttEventBus
-is_master = Parameter('mqtt_event_bus', 'master', default_value=True).value
 log_state = Parameter('mqtt_event_bus', 'log_state', default_value=True).value
 statePublishTopic = Parameter(
-    'mqtt_event_bus', 'statePublishTopic', default_value='openHAB/in/${item}/state').value
+    'mqtt_event_bus', 'statePublishTopic', default_value='').value
 commandPublishTopic = Parameter(
-    'mqtt_event_bus', 'commandPublishTopic', default_value='openHAB/out/${item}/command').value
+    'mqtt_event_bus', 'commandPublishTopic', default_value='').value
 stateSubscribeTopic = Parameter(
-    'mqtt_event_bus', 'stateSubscribeTopic', default_value='openHAB/in/${item}/state').value
+    'mqtt_event_bus', 'stateSubscribeTopic', default_value='').value
 commandSubscribeTopic = Parameter(
-    'mqtt_event_bus', 'commandSubscribeTopic', default_value='openHAB/out/${item}/command').value
+    'mqtt_event_bus', 'commandSubscribeTopic', default_value='').value
 
 
-class MqttEventBusMaster(HABApp.Rule):
-    """This rule sends states to mqtt and commands to openhab"""
-
+class MqttEventBus(HABApp.Rule):
     def __init__(self):
         super().__init__()
 
         for item in self.get_items(type=OpenhabItem):
-            item.listen_event(self.on_item_state, ItemStateEvent)
+            if statePublishTopic != '':
+                item.listen_event(self.on_item_state, ItemStateEvent)
 
-            topic = commandSubscribeTopic.replace("${item}", "{}").format(item.name)
+            if commandPublishTopic != '':
+                item.listen_event(self.on_item_command, ItemCommandEvent)
 
-            mqtt_item = MqttItem.get_create_item(f'{topic}')
-            mqtt_item.listen_event(self.on_mqtt_command, ValueUpdateEvent)
+            if commandSubscribeTopic != '':
+                topic_command = commandSubscribeTopic.replace(
+                    "${item}", "{}").format(item.name)
+
+                mqtt_item_command = MqttItem.get_create_item(f'{topic_command}')
+                mqtt_item_command.listen_event(
+                    self.on_mqtt_command, ValueUpdateEvent)
+
+            if stateSubscribeTopic != '':
+                topic_state = stateSubscribeTopic.replace(
+                    "${item}", "{}").format(item.name)
+
+                mqtt_item_state = MqttItem.get_create_item(f'{topic_state}')
+                mqtt_item_state.listen_event(
+                    self.on_mqtt_state, ValueUpdateEvent)
 
     def on_mqtt_command(self, event):
         assert isinstance(event, ValueUpdateEvent)
@@ -51,7 +63,8 @@ class MqttEventBusMaster(HABApp.Rule):
         self.openhab.send_command(item, cmd)
 
     def on_item_state(self, event: ItemStateEvent):
-        topicString = statePublishTopic.replace("${item}", "{}").format(event.name)
+        topicString = statePublishTopic.replace(
+            "${item}", "{}").format(event.name)
         topic = f'{topicString}'
         value = event.value
 
@@ -59,37 +72,24 @@ class MqttEventBusMaster(HABApp.Rule):
 
         self.mqtt.publish(topic, value)
 
-
-class MqttEventBusSlave(HABApp.Rule):
-    """This rule sends commands to mqtt and state changes to openhab"""
-
-    def __init__(self):
-        super().__init__()
-
-        for item in self.get_items(type=OpenhabItem):
-            item.listen_event(self.on_item_command, ItemCommandEvent)
-
-            topic = stateSubscribeTopic.replace("${item}", "{}").format(item.name)
-
-            mqtt_item = MqttItem.get_create_item(f'{topic}')
-            mqtt_item.listen_event(self.on_mqtt_state, ValueUpdateEvent)
-
     def on_item_command(self, event: ItemCommandEvent):
-        topicString = commandPublishTopic.replace("${item}", "{}").format(event.name)
+        topicString = commandPublishTopic.replace(
+            "${item}", "{}").format(event.name)
         topic = f'{topicString}'
-        value=event.value
+        value = event.value
 
         log.info(f'Published  MQTT topic {topic} with {value}')
 
         self.mqtt.publish(topic, value)
 
     def on_mqtt_state(self, event):
+        assert isinstance(event, ValueUpdateEvent)
 
-        name=event.name
-        itemPosition=stateSubscribeTopic.split("${item}")[0].count("/")
+        name = event.name
+        itemPosition = stateSubscribeTopic.split("${item}")[0].count("/")
 
-        item=name.split("/")[itemPosition]
-        state=event.value
+        item = name.split("/")[itemPosition]
+        state = event.value
 
         log.info(f'Subscribed MQTT topic {name} with {state}')
         self.openhab.post_update(item, state)
@@ -101,7 +101,7 @@ class LogItemStateRule(HABApp.Rule):
     def __init__(self):
         super().__init__()
 
-        for item in self.get_items(type = OpenhabItem):
+        for item in self.get_items(type=OpenhabItem):
             item.listen_event(self.on_item_change, ValueChangeEvent)
 
     def on_item_change(self, event):
@@ -109,11 +109,7 @@ class LogItemStateRule(HABApp.Rule):
         log.info(f'{event.name} changed from {event.old_value} to {event.value}')
 
 
-# create master or slave - depending on what is configured
-if is_master:
-    MqttEventBusMaster()
-else:
-    MqttEventBusSlave()
+MqttEventBus()
 
 # Create logger rule only if configured
 if log_state:

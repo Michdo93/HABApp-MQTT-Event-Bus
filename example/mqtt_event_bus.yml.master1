@@ -1,0 +1,5 @@
+log_state: true
+statePublishTopic: openHAB/in/${item}/state
+commandPublishTopic: ''
+stateSubscribeTopic: ''
+commandSubscribeTopic: openHAB/out/${item}/command

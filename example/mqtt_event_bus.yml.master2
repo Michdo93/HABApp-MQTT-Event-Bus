@@ -1,0 +1,5 @@
+log_state: true
+statePublishTopic: /messages/states/${item}
+commandPublishTopic: ''
+stateSubscribeTopic: ''
+commandSubscribeTopic: /messages/commands/${item}

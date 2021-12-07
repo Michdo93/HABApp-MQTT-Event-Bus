@@ -34,7 +34,7 @@ class MqttEventBus(HABApp.Rule):
 
             if commandSubscribeTopic != '':
                 topic_command = commandSubscribeTopic.replace(
-                    "${item}", item.name)
+                    "${item}", str(item.name))
 
                 mqtt_item_command = MqttItem.get_create_item(f'{topic_command}')
                 mqtt_item_command.listen_event(
@@ -42,7 +42,7 @@ class MqttEventBus(HABApp.Rule):
 
             if stateSubscribeTopic != '':
                 topic_state = stateSubscribeTopic.replace(
-                    "${item}", item.name)
+                    "${item}", str(item.name))
 
                 mqtt_item_state = MqttItem.get_create_item(f'{topic_state}')
                 mqtt_item_state.listen_event(

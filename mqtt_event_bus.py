@@ -26,6 +26,8 @@ class MqttEventBus(HABApp.Rule):
         super().__init__()
 
         for item in self.get_items(type=OpenhabItem):
+            self.openhab.post_update(item.name, item.get_value())
+            self.openhab.send_command(item.name, item.get_value())
             if statePublishTopic != '':
                 item.listen_event(self.on_item_state, ItemStateEvent)
 
@@ -36,7 +38,8 @@ class MqttEventBus(HABApp.Rule):
                 topic_command = commandSubscribeTopic.replace(
                     "${item}", str(item.name))
 
-                mqtt_item_command = MqttItem.get_create_item(f'{topic_command}')
+                mqtt_item_command = MqttItem.get_create_item(
+                    f'{topic_command}')
                 mqtt_item_command.listen_event(
                     self.on_mqtt_command, ValueUpdateEvent)
 
@@ -70,7 +73,7 @@ class MqttEventBus(HABApp.Rule):
 
         log.info(f'Published  MQTT topic {topic} with {value}')
 
-        self.mqtt.publish(topic, str(value))
+        self.mqtt.publish(topic, str(value), true)
 
     def on_item_command(self, event: ItemCommandEvent):
         topicString = commandPublishTopic.replace(

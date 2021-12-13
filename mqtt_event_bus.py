@@ -73,7 +73,7 @@ class MqttEventBus(HABApp.Rule):
 
         log.info(f'Published  MQTT topic {topic} with {value}')
 
-        self.mqtt.publish(topic, str(value), true)
+        self.mqtt.publish(topic, str(value), True)
 
     def on_item_command(self, event: ItemCommandEvent):
         topicString = commandPublishTopic.replace(

@@ -1,5 +1,6 @@
 import logging
-
+import time
+from typing import List
 import HABApp
 from HABApp import Parameter
 from HABApp.core.events import ValueChangeEvent, ValueUpdateEvent
@@ -11,6 +12,7 @@ log = logging.getLogger('MQTTEventBus')
 
 # These are the configuration values that will be used to setup the MqttEventBus
 log_state = Parameter('mqtt_event_bus', 'log_state', default_value=True).value
+onInit = Parameter('mqtt_event_bus', 'onInit', default_value=True).value
 statePublishTopic = Parameter(
     'mqtt_event_bus', 'statePublishTopic', default_value='').value
 commandPublishTopic = Parameter(
@@ -25,14 +27,25 @@ class MqttEventBus(HABApp.Rule):
     def __init__(self):
         super().__init__()
 
+        #onInit = None
+
+        # while onInit is None:
+        #    time.sleep(1)
+
+        # if onInit:
+        #    self._do_init()
+        #    onInit = False
+
         for item in self.get_items(type=OpenhabItem):
-            self.openhab.post_update(item.name, item.get_value())
-            self.openhab.send_command(item.name, item.get_value())
+            #self.openhab.post_update(item.name, item.get_value())
+            #self.openhab.send_command(item.name, "")
             if statePublishTopic != '':
                 item.listen_event(self.on_item_state, ItemStateEvent)
+                #item.listen_event(self.on_item_state, ValueUpdateEvent)
 
             if commandPublishTopic != '':
                 item.listen_event(self.on_item_command, ItemCommandEvent)
+                #item.listen_event(self.on_item_command, ValueUpdateEvent)
 
             if commandSubscribeTopic != '':
                 topic_command = commandSubscribeTopic.replace(
@@ -42,6 +55,8 @@ class MqttEventBus(HABApp.Rule):
                     f'{topic_command}')
                 mqtt_item_command.listen_event(
                     self.on_mqtt_command, ValueUpdateEvent)
+                mqtt_item_command.listen_event(
+                    self.on_mqtt_command, ValueChangeEvent)
 
             if stateSubscribeTopic != '':
                 topic_state = stateSubscribeTopic.replace(
@@ -50,6 +65,36 @@ class MqttEventBus(HABApp.Rule):
                 mqtt_item_state = MqttItem.get_create_item(f'{topic_state}')
                 mqtt_item_state.listen_event(
                     self.on_mqtt_state, ValueUpdateEvent)
+                mqtt_item_state.listen_event(
+                    self.on_mqtt_state, ValueChangeEvent)
+
+    def _do_init(self):
+        all_items = self.get_items(type=OpenhabItem)
+
+        for item in all_items:
+            # publish current item state in chunks
+            chunk_size = 50
+            chunk_nr = 0
+            chunk = all_items[chunk_nr *
+                              chunk_size:(chunk_nr + 1) * chunk_size]
+            while chunk:
+                #self.run.at(chunk_nr + 1, self._publish_current_state, chunk)
+                self.run.at(chunk_nr + 1, self._publish_current_command, chunk)
+                chunk_nr += 1
+                chunk = all_items[chunk_nr *
+                                  chunk_size:(chunk_nr + 1) * chunk_size]
+
+    def _publish_current_state(self, items: List[OpenhabItem]):
+        for item in items:
+            topic = statePublishTopic.replace("${item}", item.name)
+            # if statePublishTopic != '':
+            self.mqtt.publish(topic, str(item.value), retain=True)
+
+    def _publish_current_command(self, items: List[OpenhabItem]):
+        for item in items:
+            topic = commandPublishTopic.replace("${item}", event.name)
+            # if commandPublishTopic != '':
+            self.mqtt.publish(topic, "")
 
     def on_mqtt_command(self, event):
         assert isinstance(event, ValueUpdateEvent)
@@ -73,7 +118,7 @@ class MqttEventBus(HABApp.Rule):
 
         log.info(f'Published  MQTT topic {topic} with {value}')
 
-        self.mqtt.publish(topic, str(value), True)
+        self.mqtt.publish(topic, str(value), retain=True)
 
     def on_item_command(self, event: ItemCommandEvent):
         topicString = commandPublishTopic.replace(

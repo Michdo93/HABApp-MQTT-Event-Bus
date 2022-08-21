@@ -1,4 +1,16 @@
 log_state: true
+onInit: true
+brokerTransport: tcp
+brokerIP: ''
+brokerPort: 1883
+clientId: ''
+tlsPath: ''
+tlsVersion: ''
+brokerUser: ''
+brokerPWD: ''
+brokerQOS: ''
+retain: false
+brokerAsync: false
 statePublishTopic: ''
 commandPublishTopic: ''
 stateSubscribeTopic: ''

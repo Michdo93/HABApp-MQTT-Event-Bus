@@ -1,4 +1,16 @@
 log_state: true
+onInit: true
+brokerTransport: tcp
+brokerIP: 192.168.0.5
+brokerPort: 1883
+clientId: OpenHABVM
+tlsPath: ''
+tlsVersion: ''
+brokerUser: ''
+brokerPWD: ''
+brokerQOS: 0
+retain: false
+brokerAsync: false
 statePublishTopic: /messages/states/${item}
 commandPublishTopic: ''
 stateSubscribeTopic: ''

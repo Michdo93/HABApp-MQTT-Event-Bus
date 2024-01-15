@@ -9,6 +9,9 @@ import HABApp
 from HABApp import Parameter
 from HABApp.core.events import ValueChangeEvent, ValueUpdateEvent
 from HABApp.openhab.events import ItemCommandEvent, ItemStateEvent
+from HABApp.core.events import ValueChangeEventFilter, ValueUpdateEventFilter
+from HABApp.openhab.events import ItemCommandEventFilter, ItemStateEventFilter
+from HABApp.core.events import EventFilter
 from HABApp.openhab.items import OpenhabItem
 
 log = logging.getLogger('MQTTEventBus')
@@ -39,7 +42,7 @@ class MqttEventBus(HABApp.Rule):
         self.brokerPWD = Parameter(
             'mqtt_event_bus', 'brokerPWD', default_value="").value
         self.brokerQOS = Parameter(
-            'mqtt_event_bus', 'brokerQOS', default_value=0).value
+            'mqtt_event_bus', 'brokerQOS', default_value=1).value
         self.retain = Parameter(
             'mqtt_event_bus', 'retain', default_value="").value
         self.brokerAsync = Parameter(
@@ -108,11 +111,11 @@ class MqttEventBus(HABApp.Rule):
                         executor.submit(self.on_init_item(
                             item.name, item.get_value(), self.statePublishTopic), item.name)
                     executor.submit(item.listen_event(
-                        self.on_item_state, ItemStateEvent), item.name)
+                        self.on_item_state, event_filter=ItemStateEventFilter()), item.name)
 
                 if self.commandPublishTopic:
                     executor.submit(item.listen_event(
-                        self.on_item_command, ItemCommandEvent), item.name)
+                        self.on_item_command, event_filter=ItemCommandEventFilter()), item.name)
 
                 if self.commandSubscribeTopic:
                     tpc = self.commandSubscribeTopic.replace(
@@ -130,7 +133,8 @@ class MqttEventBus(HABApp.Rule):
             self.client.on_message = self.on_message
             self.client.username_pw_set(self.auth)
             self.client.connect(self.brokerIP, self.brokerPort)
-            self.client.loop_forever()
+            #self.client.loop_forever()
+            self.client.loop_start()
 
     def on_connect(self, client, userdata, flags, rc):
         self.client.subscribe(self.topics)
@@ -222,10 +226,10 @@ class LogItemStateRule(HABApp.Rule):
         with concurrent.futures.ProcessPoolExecutor() as executor:
             for item in self.get_items(type=OpenhabItem):
                 executor.submit(item.listen_event(
-                    self.on_item_change, ValueChangeEvent), item.name)
+                    self.on_item_change, ValueChangeEventFilter()), item.name)
 
-    def on_item_change(self, event):
-        assert isinstance(event, ValueChangeEvent)
+    def on_item_change(self, event:ValueChangeEvent):
+        assert isinstance(event, ValueChangeEvent), type(event)
         log.info(f'{event.name} changed from {event.old_value} to {event.value}')
 
 

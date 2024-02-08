@@ -132,7 +132,12 @@ class MqttEventBus(HABApp.Rule):
             self.client.on_connect = self.on_connect
             self.client.on_message = self.on_message
             self.client.username_pw_set(self.auth)
-            self.client.connect(self.brokerIP, self.brokerPort)
+
+            if self.brokerAsync:
+                self.client.connect_async(self.brokerIP, self.brokerPort)
+            else:
+                self.client.connect(self.brokerIP, self.brokerPort)
+
             #self.client.loop_forever()
             self.client.loop_start()
 

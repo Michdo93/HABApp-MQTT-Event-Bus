@@ -20,7 +20,7 @@ log_state = Parameter('mqtt_event_bus', 'log_state', default_value=True).value
 
 
 class MqttEventBus(HABApp.Rule):
-    def __init__(self):
+    def __init__(self, client_id_suffix):
         super().__init__()
 
         self.onInit = Parameter(
@@ -86,7 +86,7 @@ class MqttEventBus(HABApp.Rule):
             else:
                 self.broker_tls = None
 
-        self.client = mqtt.Client(client_id=self.clientId[:20]+rand, clean_session=True,
+        self.client = mqtt.Client(client_id=self.clientId[:20] + rand + client_id_suffix, clean_session=True,
                                   userdata=None, protocol=mqtt.MQTTv311, transport=self.brokerTransport)
 
         if self.broker_tls is not None:
@@ -132,13 +132,7 @@ class MqttEventBus(HABApp.Rule):
             self.client.on_connect = self.on_connect
             self.client.on_message = self.on_message
             self.client.username_pw_set(self.auth)
-
-            if self.brokerAsync:
-                self.client.connect_async(self.brokerIP, self.brokerPort)
-            else:
-                self.client.connect(self.brokerIP, self.brokerPort)
-
-            #self.client.loop_forever()
+            self.client.connect(self.brokerIP, self.brokerPort)
             self.client.loop_start()
 
     def on_connect(self, client, userdata, flags, rc):
@@ -184,10 +178,8 @@ class MqttEventBus(HABApp.Rule):
         rand = "".join(random.choice(string.ascii_uppercase + string.digits)
                        for _ in range(3))
 
-        publish.single(topic=topic, payload=str(value), qos=self.brokerQOS, retain=self.retain, hostname=self.brokerIP,
-                       port=self.brokerPort, client_id=self.clientId[:20]+rand, keepalive=60, will=None,
-                       auth=self.auth, tls=self.broker_tls,
-                       protocol=mqtt.MQTTv311, transport=self.brokerTransport)
+        self.client.publish(topic=topic, payload=str(value), qos=self.brokerQOS, retain=self.retain)
+
 
     def on_item_state(self, event: ItemStateEvent):
         topicString = self.statePublishTopic.replace(
@@ -200,10 +192,7 @@ class MqttEventBus(HABApp.Rule):
         rand = "".join(random.choice(string.ascii_uppercase + string.digits)
                        for _ in range(3))
 
-        publish.single(topic=topic, payload=str(value), qos=self.brokerQOS, retain=self.retain, hostname=self.brokerIP,
-                       port=self.brokerPort, client_id=self.clientId[:20]+rand, keepalive=60, will=None,
-                       auth=self.auth, tls=self.broker_tls,
-                       protocol=mqtt.MQTTv311, transport=self.brokerTransport)
+        self.client.publish(topic=topic, payload=str(value), qos=self.brokerQOS, retain=self.retain)
 
     def on_item_command(self, event: ItemCommandEvent):
         topicString = self.commandPublishTopic.replace(
@@ -216,10 +205,7 @@ class MqttEventBus(HABApp.Rule):
         rand = "".join(random.choice(string.ascii_uppercase + string.digits)
                        for _ in range(3))
 
-        publish.single(topic=topic, payload=str(value), qos=self.brokerQOS, retain=self.retain, hostname=self.brokerIP,
-                       port=self.brokerPort, client_id=self.clientId[:20]+rand, keepalive=60, will=None,
-                       auth=self.auth, tls=self.broker_tls,
-                       protocol=mqtt.MQTTv311, transport=self.brokerTransport)
+        self.client.publish(topic=topic, payload=str(value), qos=self.brokerQOS, retain=self.retain)
 
 
 class LogItemStateRule(HABApp.Rule):
@@ -233,12 +219,20 @@ class LogItemStateRule(HABApp.Rule):
                 executor.submit(item.listen_event(
                     self.on_item_change, ValueChangeEventFilter()), item.name)
 
-    def on_item_change(self, event:ValueChangeEvent):
+    def on_item_change(self, event: ValueChangeEvent):
         assert isinstance(event, ValueChangeEvent), type(event)
         log.info(f'{event.name} changed from {event.old_value} to {event.value}')
 
 
-MqttEventBus()
+# Anzahl der parallelen Clients
+num_clients = 1
+
+# Liste für die Clients erstellen
+mqtt_clients = []
+
+# Clients erstellen und zur Liste hinzufügen
+for i in range(num_clients):
+    mqtt_clients.append(MqttEventBus(client_id_suffix=f"_{i}"))
 
 # Create logger rule only if configured
 if log_state:
